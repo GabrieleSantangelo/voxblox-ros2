@@ -4,28 +4,41 @@
 #include "voxblox_ros/ptcloud_vis.h"
 #include "voxblox_ros/ros_params.h"
 
-namespace voxblox {
+namespace voxblox
+{
 
-EsdfServer::EsdfServer(rclcpp::Node* node_ptr)
-    : EsdfServer(node_ptr, getEsdfMapConfigFromRosParam(node_ptr),
-                 getEsdfIntegratorConfigFromRosParam(node_ptr),
-                 getTsdfMapConfigFromRosParam(node_ptr),
-                 getTsdfIntegratorConfigFromRosParam(node_ptr),
-                 getMeshIntegratorConfigFromRosParam(node_ptr)) {}
+static std::string generate_private_name(
+  const rclcpp::Node *node_ptr,
+  const std::string & name)
+{
+  if (name.empty() || name.front() == '/' || name.front() == '~') {
+    return name;
+  }
+  return std::string(node_ptr->get_name()) + "/" + name;
+}
 
-EsdfServer::EsdfServer(rclcpp::Node* node_ptr,
-                       const EsdfMap::Config& esdf_config,
-                       const EsdfIntegrator::Config& esdf_integrator_config,
-                       const TsdfMap::Config& tsdf_config,
-                       const TsdfIntegratorBase::Config& tsdf_integrator_config,
-                       const MeshIntegratorConfig& mesh_config)
-    : TsdfServer(node_ptr, tsdf_config, tsdf_integrator_config, mesh_config),
-      clear_sphere_for_planning_(false),
-      publish_esdf_map_(false),
-      publish_traversable_(false),
-      traversability_radius_(1.0),
-      incremental_update_(true),
-      num_subscribers_esdf_map_(0) {
+EsdfServer::EsdfServer(rclcpp::Node * node_ptr)
+: EsdfServer(node_ptr, getEsdfMapConfigFromRosParam(node_ptr),
+    getEsdfIntegratorConfigFromRosParam(node_ptr),
+    getTsdfMapConfigFromRosParam(node_ptr),
+    getTsdfIntegratorConfigFromRosParam(node_ptr),
+    getMeshIntegratorConfigFromRosParam(node_ptr)) {}
+
+EsdfServer::EsdfServer(
+  rclcpp::Node * node_ptr,
+  const EsdfMap::Config & esdf_config,
+  const EsdfIntegrator::Config & esdf_integrator_config,
+  const TsdfMap::Config & tsdf_config,
+  const TsdfIntegratorBase::Config & tsdf_integrator_config,
+  const MeshIntegratorConfig & mesh_config)
+: TsdfServer(node_ptr, tsdf_config, tsdf_integrator_config, mesh_config),
+  clear_sphere_for_planning_(false),
+  publish_esdf_map_(false),
+  publish_traversable_(false),
+  traversability_radius_(1.0),
+  incremental_update_(true),
+  num_subscribers_esdf_map_(0)
+{
   // Set up map and integrator.
   esdf_map_.reset(new EsdfMap(esdf_config));
   esdf_integrator_.reset(new EsdfIntegrator(esdf_integrator_config,
@@ -35,7 +48,8 @@ EsdfServer::EsdfServer(rclcpp::Node* node_ptr,
   setupRos();
 }
 
-void EsdfServer::setupRos() {
+void EsdfServer::setupRos()
+{
   // Set up publisher.
   // esdf_pointcloud_pub_ =
   //     nh_private_.advertise<pcl::PointCloud<pcl::PointXYZI>
@@ -53,16 +67,23 @@ void EsdfServer::setupRos() {
   // esdf_map_sub_ = nh_private_.subscribe("esdf_map_in", 1,
   //                                       &EsdfServer::esdfMapCallback, this);
   esdf_pointcloud_pub_ =
-      node_ptr_->create_publisher<sensor_msgs::msg::PointCloud2>(
-          "esdf_pointcloud", 1);
+    node_ptr_->create_publisher<sensor_msgs::msg::PointCloud2>(
+          // "esdf_pointcloud",
+      generate_private_name(node_ptr_, "esdf_pointcloud"),
+      1);
   esdf_slice_pub_ = node_ptr_->create_publisher<sensor_msgs::msg::PointCloud2>(
-      "esdf_slice", 1);
+      // "esdf_slice", 1);
+      generate_private_name(node_ptr_, "esdf_slice"), 1);
   traversable_pub_ = node_ptr_->create_publisher<sensor_msgs::msg::PointCloud2>(
-      "traversable", 1);
+      // "traversable", 1);
+      generate_private_name(node_ptr_, "traversable"), 1);
   esdf_map_pub_ =
-      node_ptr_->create_publisher<voxblox_msgs::msg::Layer>("esdf_map_out", 1);
+    // node_ptr_->create_publisher<voxblox_msgs::msg::Layer>("esdf_map_out", 1);
+    node_ptr_->create_publisher<voxblox_msgs::msg::Layer>(
+      generate_private_name(node_ptr_, "esdf_map_out"), 1);
   esdf_map_sub_ = node_ptr_->create_subscription<voxblox_msgs::msg::Layer>(
-      "esdf_map_in", 1,
+      // "esdf_map_in", 1,
+      generate_private_name(node_ptr_, "esdf_map_in"), 1,
       std::bind(&EsdfServer::esdfMapCallback, this, std::placeholders::_1));
 
   // Whether to clear each new pose as it comes in, and then set a sphere
@@ -119,7 +140,8 @@ void EsdfServer::setupRos() {
   }
 }
 
-void EsdfServer::publishAllUpdatedEsdfVoxels() {
+void EsdfServer::publishAllUpdatedEsdfVoxels()
+{
   // Create a pointcloud with distance = intensity.
   pcl::PointCloud<pcl::PointXYZI> pointcloud;
 
@@ -131,7 +153,8 @@ void EsdfServer::publishAllUpdatedEsdfVoxels() {
   esdf_pointcloud_pub_->publish(pointcloud_msg);
 }
 
-void EsdfServer::publishSlices() {
+void EsdfServer::publishSlices()
+{
   TsdfServer::publishSlices();
 
   pcl::PointCloud<pcl::PointXYZI> pointcloud;
@@ -142,14 +165,15 @@ void EsdfServer::publishSlices() {
 
   pointcloud.header.frame_id = world_frame_;
   sensor_msgs::msg::PointCloud2::SharedPtr pointcloud_msg(
-      new sensor_msgs::msg::PointCloud2);
+    new sensor_msgs::msg::PointCloud2);
   pcl::toROSMsg(pointcloud, *pointcloud_msg);
   esdf_slice_pub_->publish(*pointcloud_msg);
 }
 
 void EsdfServer::generateEsdfCallback(
-    const std_srvs::srv::Empty::Request::SharedPtr /*request*/,  // NOLINT
-    std_srvs::srv::Empty::Response::SharedPtr /*response*/) {    // NOLINT
+  const std_srvs::srv::Empty::Request::SharedPtr /*request*/,    // NOLINT
+  std_srvs::srv::Empty::Response::SharedPtr /*response*/)        // NOLINT
+{
   const bool clear_esdf = true;
   if (clear_esdf) {
     esdf_integrator_->updateFromTsdfLayerBatch();
@@ -161,9 +185,10 @@ void EsdfServer::generateEsdfCallback(
   publishSlices();
 }
 
-void EsdfServer::updateEsdfEvent() { updateEsdf(); }
+void EsdfServer::updateEsdfEvent() {updateEsdf();}
 
-void EsdfServer::publishPointclouds() {
+void EsdfServer::publishPointclouds()
+{
   publishAllUpdatedEsdfVoxels();
   if (publish_slices_) {
     publishSlices();
@@ -176,7 +201,8 @@ void EsdfServer::publishPointclouds() {
   TsdfServer::publishPointclouds();
 }
 
-void EsdfServer::publishTraversable() {
+void EsdfServer::publishTraversable()
+{
   pcl::PointCloud<pcl::PointXYZI> pointcloud;
   createFreePointcloudFromEsdfLayer(esdf_map_->getEsdfLayer(),
                                     traversability_radius_, &pointcloud);
@@ -186,7 +212,8 @@ void EsdfServer::publishTraversable() {
   traversable_pub_->publish(pointcloud_msg);
 }
 
-void EsdfServer::publishMap(bool reset_remote_map) {
+void EsdfServer::publishMap(bool reset_remote_map)
+{
   if (!publish_esdf_map_) {
     return;
   }
@@ -214,7 +241,8 @@ void EsdfServer::publishMap(bool reset_remote_map) {
   TsdfServer::publishMap();
 }
 
-bool EsdfServer::saveMap(const std::string& file_path) {
+bool EsdfServer::saveMap(const std::string & file_path)
+{
   // Output TSDF map first, then ESDF.
   const bool success = TsdfServer::saveMap(file_path);
 
@@ -223,7 +251,8 @@ bool EsdfServer::saveMap(const std::string& file_path) {
          io::SaveLayer(esdf_map_->getEsdfLayer(), file_path, kClearFile);
 }
 
-bool EsdfServer::loadMap(const std::string& file_path) {
+bool EsdfServer::loadMap(const std::string & file_path)
+{
   // Load in the same order: TSDF first, then ESDF.
   bool success = TsdfServer::loadMap(file_path);
 
@@ -234,37 +263,44 @@ bool EsdfServer::loadMap(const std::string& file_path) {
              kMultipleLayerSupport, esdf_map_->getEsdfLayerPtr());
 }
 
-void EsdfServer::updateEsdf() {
+void EsdfServer::updateEsdf()
+{
   if (tsdf_map_->getTsdfLayer().getNumberOfAllocatedBlocks() > 0) {
     const bool clear_updated_flag_esdf = true;
     esdf_integrator_->updateFromTsdfLayer(clear_updated_flag_esdf);
   }
 }
 
-void EsdfServer::updateEsdfBatch(bool full_euclidean) {
+void EsdfServer::updateEsdfBatch(bool full_euclidean)
+{
   if (tsdf_map_->getTsdfLayer().getNumberOfAllocatedBlocks() > 0) {
     esdf_integrator_->setFullEuclidean(full_euclidean);
     esdf_integrator_->updateFromTsdfLayerBatch();
   }
 }
 
-float EsdfServer::getEsdfMaxDistance() const {
+float EsdfServer::getEsdfMaxDistance() const
+{
   return esdf_integrator_->getEsdfMaxDistance();
 }
 
-void EsdfServer::setEsdfMaxDistance(float max_distance) {
+void EsdfServer::setEsdfMaxDistance(float max_distance)
+{
   esdf_integrator_->setEsdfMaxDistance(max_distance);
 }
 
-float EsdfServer::getTraversabilityRadius() const {
+float EsdfServer::getTraversabilityRadius() const
+{
   return traversability_radius_;
 }
 
-void EsdfServer::setTraversabilityRadius(float traversability_radius) {
+void EsdfServer::setTraversabilityRadius(float traversability_radius)
+{
   traversability_radius_ = traversability_radius;
 }
 
-void EsdfServer::newPoseCallback(const Transformation& T_G_C) {
+void EsdfServer::newPoseCallback(const Transformation & T_G_C)
+{
   if (clear_sphere_for_planning_) {
     esdf_integrator_->addNewRobotPosition(T_G_C.getPosition());
   }
@@ -275,11 +311,12 @@ void EsdfServer::newPoseCallback(const Transformation& T_G_C) {
   block_remove_timer.Stop();
 }
 
-void EsdfServer::esdfMapCallback(const voxblox_msgs::msg::Layer& layer_msg) {
+void EsdfServer::esdfMapCallback(const voxblox_msgs::msg::Layer & layer_msg)
+{
   timing::Timer receive_map_timer("map/receive_esdf");
 
   bool success =
-      deserializeMsgToLayer<EsdfVoxel>(layer_msg, esdf_map_->getEsdfLayerPtr());
+    deserializeMsgToLayer<EsdfVoxel>(layer_msg, esdf_map_->getEsdfLayerPtr());
 
   if (!success) {
     // ROS_ERROR_THROTTLE(10, "Got an invalid ESDF map message!");
@@ -296,7 +333,8 @@ void EsdfServer::esdfMapCallback(const voxblox_msgs::msg::Layer& layer_msg) {
   }
 }
 
-void EsdfServer::clear() {
+void EsdfServer::clear()
+{
   esdf_map_->getEsdfLayerPtr()->removeAllBlocks();
   esdf_integrator_->clear();
   CHECK_EQ(esdf_map_->getEsdfLayerPtr()->getNumberOfAllocatedBlocks(), 0u);

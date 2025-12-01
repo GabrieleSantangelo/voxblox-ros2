@@ -12,40 +12,44 @@
 #include "voxblox/core/voxel.h"
 #include "voxblox/interpolator/interpolator.h"
 
-namespace voxblox {
+namespace voxblox
+{
 /**
  * Map holding a Truncated Signed Distance Field Layer. Contains functions for
  * interacting with the layer and getting gradient and distance information.
  */
 class TsdfMap {
- public:
+public:
   EIGEN_MAKE_ALIGNED_OPERATOR_NEW
 
   typedef std::shared_ptr<TsdfMap> Ptr;
 
-  struct Config {
+  struct Config
+  {
     EIGEN_MAKE_ALIGNED_OPERATOR_NEW
 
-    FloatingPoint tsdf_voxel_size = 0.2;
+    FloatingPoint tsdf_voxel_size = 0.15;
     size_t tsdf_voxels_per_side = 16u;
 
     std::string print() const;
   };
 
-  explicit TsdfMap(const Config& config)
-      : tsdf_layer_(new Layer<TsdfVoxel>(config.tsdf_voxel_size,
+  explicit TsdfMap(const Config & config)
+  : tsdf_layer_(new Layer<TsdfVoxel>(config.tsdf_voxel_size,
                                          config.tsdf_voxels_per_side)),
-        interpolator_(tsdf_layer_.get()) {
+    interpolator_(tsdf_layer_.get())
+  {
     block_size_ = config.tsdf_voxel_size * config.tsdf_voxels_per_side;
   }
 
   /// Creates a new TsdfMap based on a COPY of this layer.
-  explicit TsdfMap(const Layer<TsdfVoxel>& layer)
-      : TsdfMap(aligned_shared<Layer<TsdfVoxel>>(layer)) {}
+  explicit TsdfMap(const Layer<TsdfVoxel> & layer)
+  : TsdfMap(aligned_shared<Layer<TsdfVoxel>>(layer)) {}
 
   /// Creates a new TsdfMap that contains this layer.
   explicit TsdfMap(Layer<TsdfVoxel>::Ptr layer)
-      : tsdf_layer_(layer), interpolator_(tsdf_layer_.get()) {
+  : tsdf_layer_(layer), interpolator_(tsdf_layer_.get())
+  {
     if (!layer) {
       /* NOTE(mereweth@jpl.nasa.gov) - throw std exception for Python to catch
        * This is idiomatic when wrapping C++ code for Python, especially with
@@ -61,14 +65,15 @@ class TsdfMap {
 
   virtual ~TsdfMap() {}
 
-  Layer<TsdfVoxel>* getTsdfLayerPtr() { return tsdf_layer_.get(); }
-  const Layer<TsdfVoxel>* getTsdfLayerConstPtr() const {
+  Layer<TsdfVoxel> * getTsdfLayerPtr() {return tsdf_layer_.get();}
+  const Layer<TsdfVoxel> * getTsdfLayerConstPtr() const
+  {
     return tsdf_layer_.get();
   }
-  const Layer<TsdfVoxel>& getTsdfLayer() const { return *tsdf_layer_; }
+  const Layer<TsdfVoxel> & getTsdfLayer() const {return *tsdf_layer_;}
 
-  FloatingPoint block_size() const { return block_size_; }
-  FloatingPoint voxel_size() const { return tsdf_layer_->voxel_size(); }
+  FloatingPoint block_size() const {return block_size_;}
+  FloatingPoint voxel_size() const {return tsdf_layer_->voxel_size();}
 
   /* NOTE(mereweth@jpl.nasa.gov)
    * EigenDRef is fully dynamic stride type alias for Numpy array slices
@@ -76,7 +81,7 @@ class TsdfMap {
    * Convenience alias borrowed from pybind11
    */
   using EigenDStride = Eigen::Stride<Eigen::Dynamic, Eigen::Dynamic>;
-  template <typename MatrixType>
+  template<typename MatrixType>
   using EigenDRef = Eigen::Ref<MatrixType, 0, EigenDStride>;
 
   /**
@@ -86,17 +91,19 @@ class TsdfMap {
    * coordinate along that axis
    */
   unsigned int coordPlaneSliceGetDistanceWeight(
-      unsigned int free_plane_index, double free_plane_val,
-      EigenDRef<Eigen::Matrix<double, 3, Eigen::Dynamic>>& positions,
-      Eigen::Ref<Eigen::VectorXd> distances,
-      Eigen::Ref<Eigen::VectorXd> weights, unsigned int max_points) const;
+    unsigned int free_plane_index, double free_plane_val,
+    EigenDRef<Eigen::Matrix<double, 3, Eigen::Dynamic>> & positions,
+    Eigen::Ref<Eigen::VectorXd> distances,
+    Eigen::Ref<Eigen::VectorXd> weights, unsigned int max_points) const;
 
-  bool getWeightAtPosition(const Eigen::Vector3d& position,
-                           double* weight) const;
-  bool getWeightAtPosition(const Eigen::Vector3d& position,
-                           const bool interpolate, double* weight) const;
+  bool getWeightAtPosition(
+    const Eigen::Vector3d & position,
+    double * weight) const;
+  bool getWeightAtPosition(
+    const Eigen::Vector3d & position,
+    const bool interpolate, double * weight) const;
 
- protected:
+protected:
   FloatingPoint block_size_;
 
   // The layers.

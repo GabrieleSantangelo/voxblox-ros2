@@ -23,8 +23,15 @@ Transformer::Transformer(rclcpp::Node* node_ptr)
       timestamp_tolerance_ns_(1000000) {
   // nh_private_.param("world_frame", world_frame_, world_frame_);
   // nh_private_.param("sensor_frame", sensor_frame_, sensor_frame_);
-  node_ptr_->declare_parameter("world_frame", world_frame_);
-  node_ptr_->declare_parameter("sensor_frame", sensor_frame_);
+  if (!node_ptr_->has_parameter("world_frame")) {
+    node_ptr_->declare_parameter<std::string>("world_frame", world_frame_);
+  }
+  // node_ptr_->declare_parameter("world_frame", world_frame_);
+  // node_ptr_->declare_parameter("sensor_frame", sensor_frame_);
+  if (!node_ptr_->has_parameter("sensor_frame")) {
+    node_ptr_->declare_parameter<std::string>("sensor_frame", sensor_frame_);
+  }
+
   node_ptr_->get_parameter("world_frame", world_frame_);
   node_ptr_->get_parameter("sensor_frame", sensor_frame_);
 
@@ -33,8 +40,12 @@ Transformer::Transformer(rclcpp::Node* node_ptr)
       timestamp_tolerance_ns_ / kNanoSecondsInSecond;
   // nh_private_.param("timestamp_tolerance_sec", timestamp_tolerance_sec,
   //                   timestamp_tolerance_sec);
-  node_ptr_->declare_parameter("timestamp_tolerance_sec",
-                               timestamp_tolerance_sec);
+  // node_ptr_->declare_parameter("timestamp_tolerance_sec",
+  //                              timestamp_tolerance_sec);
+  if (!node_ptr_->has_parameter("timestamp_tolerance_sec")) {
+    node_ptr_->declare_parameter("timestamp_tolerance_sec",
+                                 timestamp_tolerance_sec);
+  }
   node_ptr_->get_parameter("timestamp_tolerance_sec", timestamp_tolerance_sec);
 
   timestamp_tolerance_ns_ =
@@ -43,7 +54,10 @@ Transformer::Transformer(rclcpp::Node* node_ptr)
   // Transform settings.
   // nh_private_.param("use_tf_transforms", use_tf_transforms_,
   //                   use_tf_transforms_);
-  node_ptr_->declare_parameter("use_tf_transforms", use_tf_transforms_);
+  // node_ptr_->declare_parameter("use_tf_transforms", use_tf_transforms_);
+  if (!node_ptr_->has_parameter("use_tf_transforms")) {
+    node_ptr_->declare_parameter("use_tf_transforms", use_tf_transforms_);
+  }
   node_ptr_->get_parameter("use_tf_transforms", use_tf_transforms_);
   // If we use topic transforms, we have 2 parts: a dynamic transform from a
   // topic and a static transform from parameters.
