@@ -1,3 +1,4 @@
+#include <shared_mutex>
 #include "voxblox_ros/tsdf_server.h"
 
 #include <minkindr_conversions/kindr_msg.h>
@@ -767,6 +768,9 @@ void TsdfServer::integratePointcloud(
   const bool is_freespace_pointcloud)
 {
   CHECK_EQ(ptcloud_C.size(), colors.size());
+  // Exclusive: this is the layer's only in-process writer, and consumers that
+  // hold the layer pointer read it concurrently.
+  std::unique_lock<std::shared_mutex> lock(map_mutex_);
   tsdf_integrator_->integratePointCloud(T_G_C, ptcloud_C, colors,
                                         is_freespace_pointcloud);
 }
@@ -776,7 +780,10 @@ void TsdfServer::publishAllUpdatedTsdfVoxels()
   // Create a pointcloud with distance = intensity.
   pcl::PointCloud<pcl::PointXYZI> pointcloud;
 
-  createDistancePointcloudFromTsdfLayer(tsdf_map_->getTsdfLayer(), &pointcloud);
+  {
+    std::shared_lock<std::shared_mutex> lock(map_mutex_);
+    createDistancePointcloudFromTsdfLayer(tsdf_map_->getTsdfLayer(), &pointcloud);
+  }
 
   pointcloud.header.frame_id = world_frame_;
   sensor_msgs::msg::PointCloud2::SharedPtr pointcloud_msg(
@@ -870,6 +877,8 @@ void TsdfServer::updateMesh()
   }
 
   timing::Timer generate_mesh_timer("mesh/update");
+  // Shared: reads the layer while integration may be trying to write it.
+  std::shared_lock<std::shared_mutex> lock(map_mutex_);
   constexpr bool only_mesh_updated_blocks = true;
   constexpr bool clear_updated_flag = true;
   mesh_integrator_->generateMesh(only_mesh_updated_blocks, clear_updated_flag);
@@ -1018,8 +1027,13 @@ void TsdfServer::publishMapEvent() {publishMap();}
 
 void TsdfServer::clear()
 {
-  tsdf_map_->getTsdfLayerPtr()->removeAllBlocks();
-  mesh_layer_->clear();
+  {
+    // Scoped to the mutations only. publishMap below reads the layer and takes
+    // the lock itself, and std::shared_mutex is not recursive.
+    std::unique_lock<std::shared_mutex> lock(map_mutex_);
+    tsdf_map_->getTsdfLayerPtr()->removeAllBlocks();
+    mesh_layer_->clear();
+  }
 
   // Publish a message to reset the map to all subscribers.
   if (publish_tsdf_map_) {

@@ -2,6 +2,7 @@
 #define VOXBLOX_ROS_TSDF_SERVER_H_
 
 #include <memory>
+#include <shared_mutex>
 #include <queue>
 #include <string>
 
@@ -109,6 +110,24 @@ class TsdfServer {
 
   std::shared_ptr<TsdfMap> getTsdfMapPtr() { return tsdf_map_; }
   std::shared_ptr<const TsdfMap> getTsdfMapPtr() const { return tsdf_map_; }
+
+  /// Guards the TSDF layer.
+  ///
+  /// The layer has one writer here - the pointcloud integration, which runs on
+  /// whatever executor thread delivers the cloud - and many readers outside,
+  /// because consumers such as gbplanner's map_manager hold the layer pointer
+  /// and walk voxels directly. Under ROS 1 a single spin thread made that safe
+  /// by construction; under a multi-threaded ROS 2 executor it is not.
+  ///
+  /// It is shared rather than exclusive because the read/write ratio is heavily
+  /// lopsided: a planner does tens of queries per graph vertex over hundreds of
+  /// vertices, while integration happens at sensor rate. Serialising readers
+  /// against each other would cost far more than the races it prevents.
+  ///
+  /// Only unsynchronised layer access needs it. Calls that go through this
+  /// server's own methods must NOT hold it - those lock internally, and
+  /// std::shared_mutex is not recursive.
+  std::shared_mutex & getMapMutex() { return map_mutex_; }
 
   /// Accessors for setting and getting parameters.
   double getSliceLevel() const { return slice_level_; }
@@ -269,6 +288,7 @@ class TsdfServer {
   int num_subscribers_tsdf_map_;
 
   // Maps and integrators.
+  mutable std::shared_mutex map_mutex_;
   std::shared_ptr<TsdfMap> tsdf_map_;
   std::unique_ptr<TsdfIntegratorBase> tsdf_integrator_;
 
