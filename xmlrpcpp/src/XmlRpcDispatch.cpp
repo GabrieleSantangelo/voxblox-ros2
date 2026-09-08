@@ -3,7 +3,7 @@
 #include "xmlrpcpp/XmlRpcSource.h"
 #include "xmlrpcpp/XmlRpcUtil.h"
 
-#include "ros/time.h"
+#include <time.h>
 
 #include <math.h>
 #include <errno.h>
@@ -233,11 +233,12 @@ XmlRpcDispatch::getTime()
   return ((double) tbuff.time + ((double)tbuff.millitm / 1000.0) +
 	  ((double) tbuff.timezone * 60));
 #else
-  uint32_t sec, nsec;
+  // Was ros::ros_steadytime(), which is itself a CLOCK_MONOTONIC wrapper.
+  // Calling it directly is what makes this file buildable without roscpp.
+  struct timespec ts;
+  clock_gettime(CLOCK_MONOTONIC, &ts);
 
-  ros::ros_steadytime(sec, nsec);
-	\
-  return ((double)sec + (double)nsec / 1e9);
+  return ((double)ts.tv_sec + (double)ts.tv_nsec / 1e9);
 #endif /* USE_FTIME */
 }
 

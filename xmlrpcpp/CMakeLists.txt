@@ -22,8 +22,7 @@ link_directories(${ament_LIBRARY_DIRS})
 
 add_library(xmlrpcpp
   src/XmlRpcClient.cpp
-	#TODO(bpwilcox):port for ROS2 
-  #src/XmlRpcDispatch.cpp  
+  src/XmlRpcDispatch.cpp
   src/XmlRpcServer.cpp
   src/XmlRpcServerConnection.cpp
   src/XmlRpcServerMethod.cpp
