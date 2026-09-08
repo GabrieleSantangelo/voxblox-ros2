@@ -34,6 +34,10 @@ struct EsdfVoxel {
   Eigen::Vector3i parent = Eigen::Vector3i::Zero();
 
   EIGEN_MAKE_ALIGNED_OPERATOR_NEW
+
+  // gbplanner fork (ntnu 719b5e6): lets the ESDF path carry the same
+  // per-voxel annotation flag map_manager already uses on TsdfVoxel.
+  Color color;
 };
 
 struct OccupancyVoxel {

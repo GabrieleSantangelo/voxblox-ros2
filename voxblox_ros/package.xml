@@ -31,7 +31,6 @@
   <depend>sensor_msgs</depend>
   <depend>tf2</depend>
   <depend>tf2_ros</depend>
-  <depend>voxblox_rviz_plugin</depend>
   <depend>xmlrpcpp</depend>
 
 
